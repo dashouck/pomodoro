@@ -1,0 +1,75 @@
+/* Catppuccin Frappé palette */
+$ctp-base: #303446;
+$ctp-mantle: #292c3c;
+$ctp-surface0: #414559;
+$ctp-surface1: #51576d;
+$ctp-text: #c6d0f5;
+$ctp-subtext0: #a5adce;
+$ctp-lavender: #babbf1;
+$ctp-blue: #8caaee;
+$ctp-green: #a6d189;
+$ctp-peach: #ef9f76;
+$ctp-red: #e78284;
+$ctp-overlay0: #737994;
+
+Screen {
+    background: $ctp-base;
+}
+
+Header {
+    background: $ctp-mantle;
+    color: $ctp-text;
+}
+
+Footer {
+    background: $ctp-mantle;
+    color: $ctp-subtext0;
+}
+
+#main {
+    align: center middle;
+    height: 1fr;
+}
+
+#phase-label {
+    text-align: center;
+    width: 100%;
+    text-style: bold;
+    color: $ctp-lavender;
+    margin-bottom: 1;
+}
+
+#timer {
+    width: auto;
+    color: $ctp-green;
+    text-style: bold;
+}
+
+#button-bar {
+    margin-top: 2;
+    height: auto;
+}
+
+#button-bar Button {
+    margin: 0 1;
+    background: $ctp-surface0;
+    color: $ctp-text;
+    border: solid $ctp-surface1;
+}
+
+#button-bar Button:hover {
+    background: $ctp-surface1;
+    color: $ctp-lavender;
+}
+
+#button-bar Button:focus {
+    border: solid $ctp-blue;
+    color: $ctp-blue;
+}
+
+#session-label {
+    text-align: center;
+    width: 100%;
+    margin-top: 2;
+    color: $ctp-overlay0;
+}
