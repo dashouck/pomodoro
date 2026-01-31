@@ -213,7 +213,7 @@ class PomodoroApp(App):
     is_running: reactive[bool] = reactive(False, init=False)
     session_count: reactive[int] = reactive(0, init=False)
     phase: reactive[str] = reactive("work", init=False)
-    tick_sound: reactive[str] = reactive("Mechanical Clock", init=False)
+    tick_sound: reactive[str] = reactive("Metronome", init=False)
 
     def __init__(self) -> None:
         super().__init__()
@@ -223,7 +223,7 @@ class PomodoroApp(App):
             p = self._tick_dir / f"{name}.wav"
             _generate_sound(name, p)
             self._sound_paths[name] = p
-        self._tick_path = self._sound_paths["Mechanical Clock"]
+        self._tick_path = self._sound_paths["Metronome"]
 
     def compose(self) -> ComposeResult:
         yield Header()
