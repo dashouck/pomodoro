@@ -167,6 +167,30 @@ def _generate_sound(name: str, path: Path) -> None:
         wf.writeframes(raw)
 
 
+def _generate_bell_sound(path: Path) -> None:
+    """Generate a bell/chime WAV file to play when a phase ends."""
+    sample_rate = 44100
+    duration = 1.0
+    n_samples = int(sample_rate * duration)
+    samples = []
+    for i in range(n_samples):
+        t = i / sample_rate
+        envelope = math.exp(-t * 3)
+        tone = (
+            0.5 * math.sin(2 * math.pi * 880 * t)
+            + 0.3 * math.sin(2 * math.pi * 1760 * t)
+            + 0.2 * math.sin(2 * math.pi * 2640 * t)
+        )
+        sample = envelope * tone
+        samples.append(int(16000 * max(-1.0, min(1.0, sample))))
+    raw = b"".join(struct.pack("<h", s) for s in samples)
+    with wave.open(str(path), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(raw)
+
+
 def _play_tick(path: Path) -> None:
     """Play the tick WAV file asynchronously using a platform command."""
     if sys.platform == "darwin":
@@ -200,6 +224,7 @@ class SoundPickerScreen(ModalScreen[str]):
 
 
 class PomodoroApp(App):
+    TITLE = "PomodorO"
     CSS_PATH = "styles.tcss"
     BINDINGS = [
         ("space", "toggle_timer", "Start/Pause"),
@@ -224,6 +249,8 @@ class PomodoroApp(App):
             _generate_sound(name, p)
             self._sound_paths[name] = p
         self._tick_path = self._sound_paths["Metronome"]
+        self._bell_path = self._tick_dir / "bell.wav"
+        _generate_bell_sound(self._bell_path)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -297,6 +324,7 @@ class PomodoroApp(App):
         self.is_running = False
         self._stop_tick()
         self.bell()
+        _play_tick(self._bell_path)
 
         if self.phase == "work":
             self.session_count += 1
