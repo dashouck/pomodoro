@@ -13,16 +13,16 @@ $ctp-red: #e78284;
 $ctp-overlay0: #737994;
 
 Screen {
-    background: $ctp-base;
+    background: #2d2d2d;
 }
 
 Header {
-    background: $ctp-mantle;
+    background: #2d2d2d;
     color: $ctp-text;
 }
 
 Footer {
-    background: $ctp-mantle;
+    background: #2d2d2d;
     color: $ctp-subtext0;
 }
 
@@ -43,6 +43,7 @@ Footer {
     width: auto;
     color: $ctp-green;
     text-style: bold;
+    text-align: center;
 }
 
 #button-bar {
@@ -72,4 +73,22 @@ Footer {
     width: 100%;
     margin-top: 2;
     color: $ctp-overlay0;
+}
+
+SoundPickerScreen {
+    align: center middle;
+}
+
+#sound-list {
+    width: 40;
+    height: auto;
+    max-height: 14;
+    background: $ctp-surface0;
+    color: $ctp-text;
+    border: solid $ctp-blue;
+}
+
+#sound-list > .option-list--option-highlighted {
+    background: $ctp-surface1;
+    color: $ctp-lavender;
 }
