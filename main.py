@@ -1,9 +1,12 @@
 import math
+import os
 import random
+import signal
 import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import wave
 from pathlib import Path
 
@@ -33,6 +36,14 @@ TICK_SOUNDS = [
     "Snap",
     "Sonar",
 ]
+
+AMBIENT_SOUNDS: dict[str, str] = {
+    "01.mp3": "01.mp3",
+    "02.mp3": "02.mp3",
+    "03.mp3": "03.mp3",
+}
+
+_APP_DIR = Path(__file__).resolve().parent
 
 
 def _generate_sound(name: str, path: Path) -> None:
@@ -211,10 +222,14 @@ class SoundPickerScreen(ModalScreen[str]):
     BINDINGS = [("escape", "dismiss_picker", "Close")]
 
     def compose(self) -> ComposeResult:
-        yield OptionList(
-            *[Option(name, id=name) for name in TICK_SOUNDS],
-            id="sound-list",
-        )
+        options: list[Option] = []
+        options.append(Option("── Binaural ──", disabled=True))
+        for label in AMBIENT_SOUNDS:
+            options.append(Option(label, id=label))
+        options.append(Option("── Tick ──", disabled=True))
+        for name in TICK_SOUNDS:
+            options.append(Option(name, id=name))
+        yield OptionList(*options, id="sound-list")
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         self.dismiss(event.option.prompt)
@@ -251,6 +266,10 @@ class PomodoroApp(App):
         self._tick_path = self._sound_paths["Metronome"]
         self._bell_path = self._tick_dir / "bell.wav"
         _generate_bell_sound(self._bell_path)
+        self._is_ambient = False
+        self._ambient_proc: subprocess.Popen | None = None
+        self._ambient_stop = threading.Event()
+        self._ambient_thread: threading.Thread | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -292,8 +311,18 @@ class PomodoroApp(App):
         self.query_one("#session-label", Label).update(self._session_text())
 
     def watch_tick_sound(self, value: str) -> None:
-        if value in self._sound_paths:
+        was_running = self.is_running
+        if was_running:
+            self._stop_ambient()
+            self._stop_tick()
+        if value in AMBIENT_SOUNDS:
+            self._is_ambient = True
+            self._tick_path = _APP_DIR / AMBIENT_SOUNDS[value]
+        elif value in self._sound_paths:
+            self._is_ambient = False
             self._tick_path = self._sound_paths[value]
+        if was_running:
+            self._start_tick()
 
     def _on_sound_picked(self, name: str) -> None:
         if name:
@@ -302,6 +331,49 @@ class PomodoroApp(App):
     def action_pick_sound(self) -> None:
         self.push_screen(SoundPickerScreen(), callback=self._on_sound_picked)
 
+    # --- Ambient playback -----------------------------------------------------
+
+    def _ambient_loop(self, path: Path, stop_event: threading.Event) -> None:
+        """Loop an audio file until stop_event is set."""
+        while not stop_event.is_set():
+            cmd = ["afplay"] if sys.platform == "darwin" else ["aplay", "-q"]
+            proc = subprocess.Popen(
+                cmd + [str(path)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                preexec_fn=os.setsid,
+            )
+            self._ambient_proc = proc
+            while proc.poll() is None:
+                if stop_event.wait(timeout=0.2):
+                    try:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    except OSError:
+                        pass
+                    return
+
+    def _start_ambient(self) -> None:
+        self._stop_ambient()
+        self._ambient_stop = threading.Event()
+        t = threading.Thread(
+            target=self._ambient_loop,
+            args=(self._tick_path, self._ambient_stop),
+            daemon=True,
+        )
+        t.start()
+        self._ambient_thread = t
+
+    def _stop_ambient(self) -> None:
+        self._ambient_stop.set()
+        proc = self._ambient_proc
+        if proc is not None:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except OSError:
+                pass
+            self._ambient_proc = None
+        self._ambient_thread = None
+
     # --- Timer mechanics ------------------------------------------------------
 
     _tick_timer: Timer | None = None
@@ -309,16 +381,20 @@ class PomodoroApp(App):
     def _start_tick(self) -> None:
         if self._tick_timer is None:
             self._tick_timer = self.set_interval(1, self._tick)
+        if self._is_ambient:
+            self._start_ambient()
 
     def _stop_tick(self) -> None:
         if self._tick_timer is not None:
             self._tick_timer.stop()
             self._tick_timer = None
+        self._stop_ambient()
 
     def _tick(self) -> None:
         if self.time_left > 0:
             self.time_left -= 1
-            _play_tick(self._tick_path)
+            if not self._is_ambient:
+                _play_tick(self._tick_path)
 
     def _advance_phase(self) -> None:
         self.is_running = False
@@ -361,6 +437,10 @@ class PomodoroApp(App):
         self.is_running = False
         self._stop_tick()
         self._advance_phase()
+
+    def action_quit(self) -> None:
+        self._stop_tick()
+        self.exit()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {
